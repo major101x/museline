@@ -1,0 +1,25 @@
+🤔 What is the meaning of it all? (still buffering an answer...)
+🕯 If a function runs in a forest and no one awaits it, does it return?
+🌌 We are a way for the cosmos to know itself. And to write CRUD apps.
+🧭 The unexamined codebase is not worth shipping. - Socrates, probably
+⏳ This too shall pass. So will your linter, eventually.
+🪞 Know thyself. Then refactor thyself.
+🌊 You cannot step into the same repo twice. - Heraclitus
+🔥 The obstacle is the way. The bug is the feature. Amor fati.
+🗿 Memento mori: even this process will be killed one day.
+🌀 To think is to differ. To compile is to conform.
+🕊 He who has a why to build can bear almost any how.
+🌱 The best time to plant a tree was 20 years ago. The second best is post-merge.
+🎭 We suffer more in imagination than in production.
+🧩 The whole is greater than the sum of its microservices.
+🌗 Between stimulus and response there is a space. In that space, latency.
+🪐 Do not seek the answers, which cannot be given, because you would not be able to live them.
+🫧 Everything flows, nothing stays. Especially your requirements.
+🧠 I think, therefore I am. I cache, therefore I am fast.
+⚖️ The measure of intelligence is the ability to change your mind. And your schema.
+🌒 One does not simply reason about a distributed system.
+🕰 Time you enjoy wasting is not wasted time. Tell that to the build.
+🌾 Simplicity is the ultimate sophistication. - Leonardo, pre-YAML
+🪷 Let go of the outcome. Keep the tests.
+🌠 The only true wisdom is knowing you know nothing about the legacy code.
+🧘 Peace comes from within. Do not seek it in the changelog.

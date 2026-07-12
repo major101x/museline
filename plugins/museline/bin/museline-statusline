@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# museline-statusline - a rotating, personality-driven Claude Code statusline.
+# Runs on every statusline refresh; must stay fast and never block on the network.
+
+# Consume the session JSON Claude Code passes on stdin (we don't need it, but we
+# must drain the pipe). Available fields include .model.display_name, context, etc.
+input="$(cat 2>/dev/null)"
+: "${input:=}"
+
+# --- locate plugin root + state dir --------------------------------------------
+# When active as a plugin, CLAUDE_PLUGIN_ROOT points at the install dir. Otherwise
+# derive it from this script's location (bin/..).
+if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  ROOT="$CLAUDE_PLUGIN_ROOT"
+else
+  ROOT="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)"
+fi
+
+MUSELINE_HOME="${MUSELINE_HOME:-$HOME/.claude/museline}"
+CONFIG="$MUSELINE_HOME/config.env"
+GENERATED="$MUSELINE_HOME/generated.txt"
+LOCKDIR="$MUSELINE_HOME/.genlock"
+STAMP="$MUSELINE_HOME/.genstamp"
+
+# --- config: defaults, then user config wins, then leave pre-set env intact -----
+# Sourcing config.env sets any values the user chose. For anything it does NOT set,
+# a pre-existing environment variable survives (see the := defaults below), so env
+# overrides work for quick testing.
+[ -f "$CONFIG" ] && . "$CONFIG"
+
+: "${MUSELINE_PERSONALITIES:=philosophy trivia popculture witty}"
+: "${MUSELINE_ROTATE_SECS:=4}"
+: "${MUSELINE_LLM:=0}"
+: "${MUSELINE_GEN_EVERY_SECS:=1800}"
+
+# --- gather candidate lines -----------------------------------------------------
+files=""
+for p in $MUSELINE_PERSONALITIES; do
+  f="$ROOT/packs/$p.txt"
+  [ -f "$f" ] && files="$files $f"
+done
+
+lines=()
+while IFS= read -r line; do
+  case "$line" in
+    ''|'#'*) ;;                      # skip blanks and comments
+    *) lines+=("$line") ;;
+  esac
+done < <(cat $files "$GENERATED" 2>/dev/null)
+
+n=${#lines[@]}
+if [ "$n" -eq 0 ]; then
+  printf '%s' "🎭 museline: no packs found (check MUSELINE_PERSONALITIES)"
+  exit 0
+fi
+
+# --- pick a line: deterministic per time-bucket, scattered via a hash -----------
+epoch="$(date +%s 2>/dev/null || echo 0)"
+rot="$MUSELINE_ROTATE_SECS"; [ "$rot" -ge 1 ] 2>/dev/null || rot=4
+bucket=$(( epoch / rot ))
+# Knuth multiplicative hash keeps consecutive buckets from landing on neighbours.
+idx=$(( (bucket * 2654435761 % n + n) % n ))
+printf '%s' "${lines[$idx]}"
+
+# --- optionally kick off a background LLM refill (never blocks display) ---------
+# Debounce on a stamp file that's touched at every attempt (success OR failure),
+# so a missing/invalid key can't make us re-spawn the generator every refresh.
+if [ "$MUSELINE_LLM" = "1" ]; then
+  need_gen=0
+  if [ ! -f "$STAMP" ]; then
+    need_gen=1
+  else
+    mtime="$(stat -c %Y "$STAMP" 2>/dev/null || stat -f %m "$STAMP" 2>/dev/null || echo 0)"
+    [ $(( epoch - mtime )) -ge "$MUSELINE_GEN_EVERY_SECS" ] && need_gen=1
+  fi
+  if [ "$need_gen" = "1" ] && mkdir "$LOCKDIR" 2>/dev/null; then
+    : > "$STAMP"    # mark the attempt time before spawning
+    # Detach so the generator outlives this short-lived statusline process.
+    nohup sh -c '"$0"; rmdir "$1" 2>/dev/null' \
+      "$ROOT/bin/museline-generate" "$LOCKDIR" >/dev/null 2>&1 &
+  fi
+fi
+
+exit 0

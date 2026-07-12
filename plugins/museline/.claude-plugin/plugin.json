@@ -1,0 +1,12 @@
+{
+  "name": "museline",
+  "displayName": "Museline",
+  "version": "1.0.0",
+  "description": "A rotating, personality-driven Claude Code statusline: philosophy, trivia, pop-culture, and witty loading lines - optionally generated live by your own LLM.",
+  "author": {
+    "name": "major",
+    "email": "major101x@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": ["statusline", "fun", "quotes", "trivia", "philosophy"]
+}

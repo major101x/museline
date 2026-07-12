@@ -1,0 +1,15 @@
+{
+  "name": "museline-marketplace",
+  "owner": {
+    "name": "major",
+    "email": "major101x@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "museline",
+      "source": "./plugins/museline",
+      "description": "A rotating, personality-driven Claude Code statusline: philosophy, trivia, pop-culture, and witty loading lines - optionally generated live by your own LLM.",
+      "keywords": ["statusline", "fun", "quotes", "trivia"]
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# museline-generate - refill the LLM-generated line cache. Runs in the background,
+# detached from the statusline. Any failure (no key, offline, bad response) is
+# swallowed silently: the curated packs always remain as a fallback.
+
+set -u
+
+MUSELINE_HOME="${MUSELINE_HOME:-$HOME/.claude/museline}"
+CONFIG="$MUSELINE_HOME/config.env"
+GENERATED="$MUSELINE_HOME/generated.txt"
+mkdir -p "$MUSELINE_HOME" 2>/dev/null || exit 0
+
+[ -f "$CONFIG" ] && . "$CONFIG"
+
+: "${MUSELINE_PERSONALITIES:=philosophy trivia popculture witty}"
+: "${MUSELINE_PROVIDER:=anthropic}"
+: "${MUSELINE_GEN_COUNT:=15}"
+: "${MUSELINE_GEN_MAX:=200}"          # cap the cache so it can't grow forever
+
+# Default model per provider unless the user pinned one.
+if [ -z "${MUSELINE_MODEL:-}" ]; then
+  case "$MUSELINE_PROVIDER" in
+    openai) MUSELINE_MODEL="gpt-4o-mini" ;;
+    *)      MUSELINE_MODEL="claude-haiku-4-5-20251001" ;;
+  esac
+fi
+
+# Resolve the API key: direct MUSELINE_API_KEY, else the env var named by MUSELINE_API_KEY_ENV.
+if [ -z "${MUSELINE_API_KEY:-}" ]; then
+  case "$MUSELINE_PROVIDER" in
+    openai) : "${MUSELINE_API_KEY_ENV:=OPENAI_API_KEY}" ;;
+    *)      : "${MUSELINE_API_KEY_ENV:=ANTHROPIC_API_KEY}" ;;
+  esac
+  eval "MUSELINE_API_KEY=\"\${$MUSELINE_API_KEY_ENV:-}\""
+fi
+[ -n "$MUSELINE_API_KEY" ] || exit 0    # no key → nothing to do; curated packs stay
+
+# Need a JSON-capable runtime for a safe request/response. Prefer python3, then node.
+RUNTIME=""
+command -v python3 >/dev/null 2>&1 && RUNTIME="python3"
+[ -z "$RUNTIME" ] && command -v node >/dev/null 2>&1 && RUNTIME="node"
+[ -n "$RUNTIME" ] || exit 0
+
+PROMPT="Write ${MUSELINE_GEN_COUNT} very short status-bar one-liners for a coding assistant's loading indicator.
+Blend these personalities: ${MUSELINE_PERSONALITIES}.
+Rules: each line stands alone; start each with a single relevant emoji then a space; keep each under ~70 characters; be witty, insightful, or a genuinely interesting fact; no numbering, no quotes, no markdown; exactly one line per idea; keep it workplace-safe and kind."
+
+export MUSELINE_PROVIDER MUSELINE_MODEL MUSELINE_API_KEY PROMPT
+
+new_lines="$(
+if [ "$RUNTIME" = "python3" ]; then
+python3 - <<'PY'
+import os, json, sys, urllib.request
+
+provider = os.environ["MUSELINE_PROVIDER"]
+model    = os.environ["MUSELINE_MODEL"]
+key      = os.environ["MUSELINE_API_KEY"]
+prompt   = os.environ["PROMPT"]
+
+try:
+    if provider == "openai":
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json"}
+        body = {"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 700}
+    else:
+        url = "https://api.anthropic.com/v1/messages"
+        headers = {"x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json"}
+        body = {"model": model, "max_tokens": 700, "messages": [{"role": "user", "content": prompt}]}
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
+    with urllib.request.urlopen(req, timeout=25) as r:
+        data = json.load(r)
+    if provider == "openai":
+        text = data["choices"][0]["message"]["content"]
+    else:
+        text = "".join(p.get("text", "") for p in data.get("content", []))
+    sys.stdout.write(text)
+except Exception:
+    sys.exit(0)
+PY
+else
+node -e '
+const https = require("https");
+const provider = process.env.MUSELINE_PROVIDER, model = process.env.MUSELINE_MODEL;
+const key = process.env.MUSELINE_API_KEY, prompt = process.env.PROMPT;
+let url, headers, body;
+if (provider === "openai") {
+  url = "https://api.openai.com/v1/chat/completions";
+  headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json"};
+  body = {model, messages: [{role: "user", content: prompt}], max_tokens: 700};
+} else {
+  url = "https://api.anthropic.com/v1/messages";
+  headers = {"x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json"};
+  body = {model, max_tokens: 700, messages: [{role: "user", content: prompt}]};
+}
+const data = JSON.stringify(body);
+const u = new URL(url);
+const req = https.request({hostname: u.hostname, path: u.pathname, method: "POST", headers}, (res) => {
+  let buf = "";
+  res.on("data", (d) => buf += d);
+  res.on("end", () => {
+    try {
+      const j = JSON.parse(buf);
+      const text = provider === "openai" ? j.choices[0].message.content
+                 : (j.content || []).map(p => p.text || "").join("");
+      process.stdout.write(text || "");
+    } catch (e) {}
+  });
+});
+req.on("error", () => {});
+req.write(data); req.end();
+'
+fi
+)"
+
+[ -n "$new_lines" ] || exit 0
+
+# --- merge: keep unique, non-empty, sane lines; append to the cache; cap size ---
+tmp="$MUSELINE_HOME/.gen.tmp"
+: > "$tmp"
+[ -f "$GENERATED" ] && cat "$GENERATED" >> "$tmp"
+printf '%s\n' "$new_lines" >> "$tmp"
+
+# Strip blanks/junk, drop dupes (stable order), and keep only the last MUSELINE_GEN_MAX.
+awk 'NF && length($0) <= 120 && !seen[$0]++' "$tmp" | tail -n "$MUSELINE_GEN_MAX" > "$GENERATED"
+rm -f "$tmp" 2>/dev/null
+
+exit 0

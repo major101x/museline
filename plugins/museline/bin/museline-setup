@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# museline-setup - one-shot installer helper.
+# 1) seeds ~/.claude/museline/config.env from the shipped example (if missing)
+# 2) points the "statusLine" in the user's settings.json at museline-statusline
+#
+# Safe to re-run: it merges into existing settings.json without clobbering
+# unrelated keys, and backs the file up first.
+
+set -u
+
+# Resolve the plugin root (works whether invoked via PATH or directly).
+if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  ROOT="$CLAUDE_PLUGIN_ROOT"
+else
+  ROOT="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)"
+fi
+
+MUSELINE_HOME="${MUSELINE_HOME:-$HOME/.claude/museline}"
+SETTINGS="${1:-$HOME/.claude/settings.json}"
+STATUSLINE="$ROOT/bin/museline-statusline"
+REFRESH="${MUSELINE_ROTATE_SECS:-2}"
+
+mkdir -p "$MUSELINE_HOME" 2>/dev/null
+
+# 1) seed config
+if [ ! -f "$MUSELINE_HOME/config.env" ] && [ -f "$ROOT/config.env.example" ]; then
+  cp "$ROOT/config.env.example" "$MUSELINE_HOME/config.env"
+  echo "museline: created $MUSELINE_HOME/config.env (edit it to pick personalities / enable your LLM)"
+else
+  echo "museline: config at $MUSELINE_HOME/config.env (left as-is)"
+fi
+
+# 2) wire the statusline into settings.json (needs python3 or node for safe JSON)
+RUNTIME=""
+command -v python3 >/dev/null 2>&1 && RUNTIME="python3"
+[ -z "$RUNTIME" ] && command -v node >/dev/null 2>&1 && RUNTIME="node"
+
+if [ -z "$RUNTIME" ]; then
+  cat <<EOF
+museline: could not find python3 or node to edit settings.json automatically.
+Add this to $SETTINGS yourself:
+
+  "statusLine": {
+    "type": "command",
+    "command": "$STATUSLINE",
+    "refreshInterval": $REFRESH
+  }
+EOF
+  exit 0
+fi
+
+mkdir -p "$(dirname "$SETTINGS")" 2>/dev/null
+[ -f "$SETTINGS" ] && cp "$SETTINGS" "$SETTINGS.museline-backup"
+
+export SETTINGS STATUSLINE REFRESH
+
+if [ "$RUNTIME" = "python3" ]; then
+python3 - <<'PY'
+import os, json
+path = os.environ["SETTINGS"]
+try:
+    with open(path) as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        data = {}
+except Exception:
+    data = {}
+prev = data.get("statusLine")
+data["statusLine"] = {
+    "type": "command",
+    "command": os.environ["STATUSLINE"],
+    "refreshInterval": int(os.environ["REFRESH"]),
+}
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+if prev and prev != data["statusLine"]:
+    print("museline: replaced an existing statusLine (backup at %s.museline-backup)" % path)
+print("museline: statusLine wired into %s" % path)
+PY
+else
+node -e '
+const fs = require("fs");
+const path = process.env.SETTINGS;
+let data = {};
+try { const j = JSON.parse(fs.readFileSync(path, "utf8")); if (j && typeof j === "object") data = j; } catch (e) {}
+const prev = data.statusLine;
+data.statusLine = { type: "command", command: process.env.STATUSLINE, refreshInterval: parseInt(process.env.REFRESH, 10) };
+fs.writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
+if (prev && JSON.stringify(prev) !== JSON.stringify(data.statusLine))
+  console.log("museline: replaced an existing statusLine (backup at " + path + ".museline-backup)");
+console.log("museline: statusLine wired into " + path);
+'
+fi
+
+echo "museline: done. Start a new Claude Code session (or wait a moment) to see it."
