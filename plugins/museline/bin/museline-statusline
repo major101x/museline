@@ -33,21 +33,48 @@ STAMP="$MUSELINE_HOME/.genstamp"
 : "${MUSELINE_LLM:=0}"
 : "${MUSELINE_GEN_EVERY_SECS:=1800}"
 : "${MUSELINE_EMOJI:=1}"    # 0 = strip leading emoji (for terminals that can't render them)
+: "${MUSELINE_ICON:=}"      # emoji | none | nerd ; empty = derive from MUSELINE_EMOJI
 
-# --- gather candidate lines -----------------------------------------------------
-files=""
+# Resolve the display mode. MUSELINE_ICON wins when set; otherwise fall back to
+# the older MUSELINE_EMOJI flag (1 -> emoji, 0 -> none) for compatibility.
+mode="$MUSELINE_ICON"
+if [ -z "$mode" ]; then
+  case "$MUSELINE_EMOJI" in 0) mode="none" ;; *) mode="emoji" ;; esac
+fi
+
+# Nerd Font glyph per personality (monochrome PUA icons that inherit the theme
+# color, unlike color emoji). Emitted as octal UTF-8 so it works on old bash too.
+nerd_icon() {
+  case "$1" in
+    philosophy) printf '\357\200\255' ;;   # nf-fa-book        U+F02D
+    trivia)     printf '\357\203\253' ;;   # nf-fa-lightbulb_o U+F0EB
+    popculture) printf '\357\200\201' ;;   # nf-fa-music       U+F001
+    witty)      printf '\357\203\220' ;;   # nf-fa-magic       U+F0D0
+    *)          printf '\357\200\205' ;;   # nf-fa-star        U+F005 (generated/custom)
+  esac
+}
+
+# --- gather candidate lines (tracking each line's source pack) ------------------
+lines=()
+origins=()
 for p in $MUSELINE_PERSONALITIES; do
   f="$ROOT/packs/$p.txt"
-  [ -f "$f" ] && files="$files $f"
+  [ -f "$f" ] || continue
+  while IFS= read -r line; do
+    case "$line" in
+      ''|'#'*) ;;                      # skip blanks and comments
+      *) lines+=("$line"); origins+=("$p") ;;
+    esac
+  done < "$f"
 done
-
-lines=()
-while IFS= read -r line; do
-  case "$line" in
-    ''|'#'*) ;;                      # skip blanks and comments
-    *) lines+=("$line") ;;
-  esac
-done < <(cat $files "$GENERATED" 2>/dev/null)
+if [ -f "$GENERATED" ]; then
+  while IFS= read -r line; do
+    case "$line" in
+      ''|'#'*) ;;
+      *) lines+=("$line"); origins+=("generated") ;;
+    esac
+  done < "$GENERATED"
+fi
 
 n=${#lines[@]}
 if [ "$n" -eq 0 ]; then
@@ -62,15 +89,23 @@ bucket=$(( epoch / rot ))
 # Knuth multiplicative hash keeps consecutive buckets from landing on neighbours.
 idx=$(( (bucket * 2654435761 % n + n) % n ))
 line="${lines[$idx]}"
+origin="${origins[$idx]}"
 
-# Terminals that can't render color emoji (e.g. Alacritty) show tofu. When
-# MUSELINE_EMOJI=0, strip a leading emoji + space, but only if the line actually
-# starts with a non-ASCII byte, so plain-text custom lines are left untouched.
-if [ "$MUSELINE_EMOJI" = "0" ]; then
-  case "$line" in
-    [$'\x80'-$'\xff']*) line="${line#* }" ;;
-  esac
-fi
+# --- apply the display mode -----------------------------------------------------
+# "none" and "nerd" first strip a leading emoji, but only if the line actually
+# begins with a non-ASCII byte, so plain-text custom lines are left untouched.
+case "$mode" in
+  none)
+    case "$line" in [$'\x80'-$'\xff']*) line="${line#* }" ;; esac
+    ;;
+  nerd)
+    case "$line" in [$'\x80'-$'\xff']*) line="${line#* }" ;; esac
+    line="$(nerd_icon "$origin") $line"
+    ;;
+  emoji|*)
+    : # leave the line exactly as authored
+    ;;
+esac
 printf '%s' "$line"
 
 # --- optionally kick off a background LLM refill (never blocks display) ---------

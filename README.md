@@ -63,12 +63,16 @@ Edit `~/.claude/museline/config.env` (created by `/museline:setup`; template in
 MUSELINE_PERSONALITIES="philosophy trivia popculture witty"   # pick any subset
 MUSELINE_ROTATE_SECS=4                                        # seconds per line
 MUSELINE_LLM=0                                                # 1 = generate with your LLM
-MUSELINE_EMOJI=1                                              # 0 = strip emoji (e.g. Alacritty)
+MUSELINE_ICON="emoji"                                         # emoji | none | nerd
 ```
 
 > **Emoji look like boxes?** Some terminals (notably Alacritty) do not render
-> color emoji well. Set `MUSELINE_EMOJI=0` and museline shows clean plain-text
-> lines instead.
+> color emoji well. You have two fixes:
+> - `MUSELINE_ICON="none"` shows clean plain-text lines.
+> - `MUSELINE_ICON="nerd"` prefixes each line with a monochrome per-personality
+>   [Nerd Font](https://www.nerdfonts.com) glyph (book for philosophy, lightbulb
+>   for trivia, music note for pop-culture, magic wand for witty). They inherit
+>   your theme color, exactly like Claude Code's own UI. Requires a Nerd Font.
 
 Two intervals work together:
 
