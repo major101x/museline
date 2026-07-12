@@ -62,7 +62,12 @@ Edit `~/.claude/museline/config.env` (created by `/museline:setup`; template in
 MUSELINE_PERSONALITIES="philosophy trivia popculture witty"   # pick any subset
 MUSELINE_ROTATE_SECS=4                                         # seconds per line
 MUSELINE_LLM=0                                                 # 1 = generate with your LLM
+MUSELINE_EMOJI=1                                               # 0 = strip emoji (e.g. Alacritty)
 ```
+
+> **Emoji look like boxes?** Some terminals (notably Alacritty) do not render
+> color emoji well. Set `MUSELINE_EMOJI=0` and museline shows clean plain-text
+> lines instead.
 
 Two intervals work together:
 

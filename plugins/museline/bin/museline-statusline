@@ -32,6 +32,7 @@ STAMP="$MUSELINE_HOME/.genstamp"
 : "${MUSELINE_ROTATE_SECS:=4}"
 : "${MUSELINE_LLM:=0}"
 : "${MUSELINE_GEN_EVERY_SECS:=1800}"
+: "${MUSELINE_EMOJI:=1}"    # 0 = strip leading emoji (for terminals that can't render them)
 
 # --- gather candidate lines -----------------------------------------------------
 files=""
@@ -60,7 +61,17 @@ rot="$MUSELINE_ROTATE_SECS"; [ "$rot" -ge 1 ] 2>/dev/null || rot=4
 bucket=$(( epoch / rot ))
 # Knuth multiplicative hash keeps consecutive buckets from landing on neighbours.
 idx=$(( (bucket * 2654435761 % n + n) % n ))
-printf '%s' "${lines[$idx]}"
+line="${lines[$idx]}"
+
+# Terminals that can't render color emoji (e.g. Alacritty) show tofu. When
+# MUSELINE_EMOJI=0, strip a leading emoji + space, but only if the line actually
+# starts with a non-ASCII byte, so plain-text custom lines are left untouched.
+if [ "$MUSELINE_EMOJI" = "0" ]; then
+  case "$line" in
+    [$'\x80'-$'\xff']*) line="${line#* }" ;;
+  esac
+fi
+printf '%s' "$line"
 
 # --- optionally kick off a background LLM refill (never blocks display) ---------
 # Debounce on a stamp file that's touched at every attempt (success OR failure),
