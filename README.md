@@ -64,7 +64,12 @@ MUSELINE_PERSONALITIES="philosophy trivia popculture witty"   # pick any subset
 MUSELINE_ROTATE_SECS=4                                        # seconds per line
 MUSELINE_LLM=0                                                # 1 = generate with your LLM
 MUSELINE_ICON="emoji"                                         # emoji | none | nerd
+MUSELINE_COLOR=""                                            # "#rrggbb" tint, e.g. "#d97757"
 ```
+
+Set `MUSELINE_COLOR` to a `#rrggbb` hex to tint the line (truecolor terminals);
+`"#d97757"` is Claude's signature orange, matching the loading-spinner accent.
+Color emoji keep their own colors; plain text and Nerd Font glyphs take the tint.
 
 > **Emoji showing as boxes?** That is a terminal/font limitation (common in
 > Alacritty), not a bug. See

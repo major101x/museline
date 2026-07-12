@@ -34,6 +34,7 @@ STAMP="$MUSELINE_HOME/.genstamp"
 : "${MUSELINE_GEN_EVERY_SECS:=1800}"
 : "${MUSELINE_EMOJI:=1}"    # 0 = strip leading emoji (for terminals that can't render them)
 : "${MUSELINE_ICON:=}"      # emoji | none | nerd ; empty = derive from MUSELINE_EMOJI
+: "${MUSELINE_COLOR:=}"     # hex like "#d97757" to tint the text; empty = terminal default
 
 # Resolve the display mode. MUSELINE_ICON wins when set; otherwise fall back to
 # the older MUSELINE_EMOJI flag (1 -> emoji, 0 -> none) for compatibility.
@@ -106,7 +107,23 @@ case "$mode" in
     : # leave the line exactly as authored
     ;;
 esac
-printf '%s' "$line"
+
+# --- optional color: wrap the line in a truecolor ANSI escape -------------------
+# MUSELINE_COLOR is a "#rrggbb" hex. Color emoji keep their own color; monochrome
+# text and Nerd glyphs take the tint (like Claude Code's accent-colored UI).
+open=""; close=""
+case "$MUSELINE_COLOR" in
+  \#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f])
+    hex="${MUSELINE_COLOR#\#}"
+    r=$(( 16#${hex%????} ))
+    g=$(( 16#${hex:2:2} ))
+    b=$(( 16#${hex:4:2} ))
+    esc="$(printf '\033')"
+    open="${esc}[38;2;${r};${g};${b}m"
+    close="${esc}[0m"
+    ;;
+esac
+printf '%s' "${open}${line}${close}"
 
 # --- optionally kick off a background LLM refill (never blocks display) ---------
 # Debounce on a stamp file that's touched at every attempt (success OR failure),
