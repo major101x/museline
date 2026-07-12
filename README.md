@@ -66,13 +66,9 @@ MUSELINE_LLM=0                                                # 1 = generate wit
 MUSELINE_ICON="emoji"                                         # emoji | none | nerd
 ```
 
-> **Emoji look like boxes?** Some terminals (notably Alacritty) do not render
-> color emoji well. You have two fixes:
-> - `MUSELINE_ICON="none"` shows clean plain-text lines.
-> - `MUSELINE_ICON="nerd"` prefixes each line with a monochrome per-personality
->   [Nerd Font](https://www.nerdfonts.com) glyph (book for philosophy, lightbulb
->   for trivia, music note for pop-culture, magic wand for witty). They inherit
->   your theme color, exactly like Claude Code's own UI. Requires a Nerd Font.
+> **Emoji showing as boxes?** That is a terminal/font limitation (common in
+> Alacritty), not a bug. See
+> [Icons, emoji, and your terminal](#icons-emoji-and-your-terminal) for the fix.
 
 Two intervals work together:
 
@@ -102,6 +98,42 @@ key, no network, or a bad key just means you get the curated packs.
 Each pack in [`plugins/museline/packs/`](./plugins/museline/packs) is one display
 line per row (a leading emoji is nice but optional). Edit them, or add a new
 `packs/<name>.txt` and include `<name>` in `MUSELINE_PERSONALITIES`.
+
+## Icons, emoji, and your terminal
+
+museline leads each line with an icon. How well it renders depends on your
+terminal and font, so there are three modes, set with `MUSELINE_ICON`:
+
+| Mode | What you get | Best for |
+|------|--------------|----------|
+| `emoji` (default) | Color emoji as written in the packs | Terminals with good color-emoji support (kitty, WezTerm, foot, iTerm2, most GUI terminals) |
+| `nerd` | A monochrome per-personality Nerd Font glyph that inherits your theme color | Anyone using a [Nerd Font](https://www.nerdfonts.com), including Alacritty |
+| `none` | Plain text, no leading icon | Any terminal, zero font requirements |
+
+### Why emoji can look broken
+
+Color emoji (like the whale in a "Random fact" line) are **bitmap** glyphs that
+carry their own color and live in a dedicated emoji font such as Noto Color Emoji.
+Some terminals, most notably **Alacritty**, do not scale or render those bitmap
+color fonts well, so the emoji shows up as an empty box ("tofu") or a blank space.
+By contrast, the icons Claude Code uses in its own UI are monochrome **vector**
+glyphs from the loaded text font, which is why they always render and take the
+theme color.
+
+This is a terminal/font limitation, not a museline bug. Three ways to fix it:
+
+1. **Use a terminal with solid color-emoji rendering.** kitty, WezTerm, foot, and
+   iTerm2 all handle emoji cleanly. Keep `MUSELINE_ICON="emoji"`.
+2. **Switch to Nerd Font glyphs.** Set `MUSELINE_ICON="nerd"`. These are the same
+   kind of monochrome vector glyphs Claude Code uses for its icons: they live in
+   your text font, render anywhere the Nerd Font is loaded, and pick up your theme
+   color. Default mapping: book (philosophy), lightbulb (trivia), music note
+   (pop-culture), magic wand (witty), and star (LLM-generated lines).
+3. **Drop icons entirely.** Set `MUSELINE_ICON="none"` for plain text that works
+   in any terminal.
+
+`MUSELINE_ICON` supersedes the older `MUSELINE_EMOJI` flag (`1` = emoji, `0` =
+none), which is still honored when `MUSELINE_ICON` is unset.
 
 ## How it works
 
