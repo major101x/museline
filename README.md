@@ -71,10 +71,6 @@ Set `MUSELINE_COLOR` to a `#rrggbb` hex to tint the line (truecolor terminals);
 `"#d97757"` is Claude's signature orange, matching the loading-spinner accent.
 Color emoji keep their own colors; plain text and Nerd Font glyphs take the tint.
 
-Claude Code has no vertical-padding setting, so if the line looks cramped, use
-`MUSELINE_PAD_TOP` and `MUSELINE_PAD_BOTTOM` (a count of blank rows) to add
-breathing room above and below.
-
 > **Emoji showing as boxes?** That is a terminal/font limitation (common in
 > Alacritty), not a bug. See
 > [Icons, emoji, and your terminal](#icons-emoji-and-your-terminal) for the fix.
