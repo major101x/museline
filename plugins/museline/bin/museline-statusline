@@ -35,6 +35,8 @@ STAMP="$MUSELINE_HOME/.genstamp"
 : "${MUSELINE_EMOJI:=1}"    # 0 = strip leading emoji (for terminals that can't render them)
 : "${MUSELINE_ICON:=}"      # emoji | none | nerd ; empty = derive from MUSELINE_EMOJI
 : "${MUSELINE_COLOR:=}"     # hex like "#d97757" to tint the text; empty = terminal default
+: "${MUSELINE_PAD_TOP:=0}"     # blank rows to print above the line (vertical spacing)
+: "${MUSELINE_PAD_BOTTOM:=0}"  # blank rows to print below the line
 
 # Resolve the display mode. MUSELINE_ICON wins when set; otherwise fall back to
 # the older MUSELINE_EMOJI flag (1 -> emoji, 0 -> none) for compatibility.
@@ -123,7 +125,13 @@ case "$MUSELINE_COLOR" in
     close="${esc}[0m"
     ;;
 esac
+
+# Claude Code renders each printed line as its own row, so blank rows above/below
+# add vertical breathing room. (There is no vertical-padding setting.)
+pad() { i=0; while [ "${i:-0}" -lt "${1:-0}" ] 2>/dev/null; do printf '\n'; i=$((i + 1)); done; }
+pad "$MUSELINE_PAD_TOP"
 printf '%s' "${open}${line}${close}"
+pad "$MUSELINE_PAD_BOTTOM"
 
 # --- optionally kick off a background LLM refill (never blocks display) ---------
 # Debounce on a stamp file that's touched at every attempt (success OR failure),
